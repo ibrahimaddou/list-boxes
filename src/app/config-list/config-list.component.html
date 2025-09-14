@@ -1,0 +1,11 @@
+<h1>Configurations</h1>
+
+<div *ngIf="loading">Chargement...</div>
+
+<div class="config-grid" *ngIf="!loading">
+  <div *ngFor="let config of configs" class="config-box" (click)="onConfigClick(config)">
+    <i class="fas {{ config.icon }}"></i>
+    <h3>{{ config.title }}</h3>
+    <small>{{ config.name }}</small>
+  </div>
+</div>

@@ -1,0 +1,64 @@
+[
+    {
+      "id": "testconfig1",
+      "name": "testconfig1",
+      "title": "Configuration de Test 1",
+      "icon": "fa-cog",
+      "parameters": [
+        {
+          "name": "host",
+          "type": "text",
+          "label": "Nom d'hôte",
+          "required": true,
+          "defaultValue": "localhost"
+        },
+        {
+          "name": "port",
+          "type": "number",
+          "label": "Port",
+          "required": true,
+          "defaultValue": 8080
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "label": "Activé",
+          "required": false,
+          "defaultValue": true
+        }
+      ]
+    },
+    {
+      "id": "testconfig2",
+      "name": "testconfig2",
+      "title": "Configuration de Test 2",
+      "icon": "fa-database",
+      "parameters": [
+        {
+          "name": "database_type",
+          "type": "select",
+          "label": "Type de base de données",
+          "required": true,
+          "options": ["MySQL", "PostgreSQL", "Oracle"],
+          "defaultValue": "MySQL"
+        }
+      ]
+    },
+    {
+      "id": "testconfig3",
+      "name": "testconfig3",
+      "title": "Configuration de Test 3",
+      "icon": "fa-database",
+      "parameters": [
+        {
+          "name": "database_type",
+          "type": "select",
+          "label": "Type de base de données",
+          "required": true,
+          "options": ["MySQL", "PostgreSQL", "Oracle"],
+          "defaultValue": "MySQL"
+        }
+      ]
+    }
+  ]
+  

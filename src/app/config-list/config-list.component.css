@@ -1,0 +1,22 @@
+.config-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+  }
+  
+  .config-box {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: 0.3s;
+    width: 200px;
+  }
+  
+  .config-box:hover {
+    transform: scale(1.05);
+    border-color: #011786;
+  }

@@ -1,0 +1,57 @@
+<div *ngIf="config; else loadingTpl" class="form-container">
+  <div class="form-header">
+    <button class="back-button" (click)="goBack()">
+      <i class="fas fa-arrow-left"></i> Retour
+    </button>
+    <h1>{{ config?.title }}</h1>
+  </div>
+
+  <form [formGroup]="configForm" (ngSubmit)="onSubmit()">
+    <div class="form-grid">
+      <div *ngFor="let param of config?.parameters" class="form-field">
+        <label [for]="param.name">
+          {{ param.label }}
+          <span *ngIf="param.required" class="required">*</span>
+        </label>
+
+        <input *ngIf="param.type === 'text' || param.type === 'number'"
+               [type]="param.type"
+               [id]="param.name"
+               [formControlName]="param.name"
+               class="form-input"/>
+
+        <input *ngIf="param.type === 'boolean'"
+               type="checkbox"
+               [id]="param.name"
+               [formControlName]="param.name"
+               class="form-checkbox"/>
+
+        <select *ngIf="param.type === 'select'"
+                [id]="param.name"
+                [formControlName]="param.name"
+                class="form-select">
+          <option value="">Sélectionner...</option>
+          <option *ngFor="let option of param.options" [value]="option">
+            {{ option }}
+          </option>
+        </select>
+
+        <div *ngIf="configForm.get(param.name)?.invalid && configForm.get(param.name)?.touched"
+             class="error-message">
+          Ce champ est requis
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn-cancel" (click)="goBack()">Annuler</button>
+      <button type="submit" class="btn-submit" [disabled]="configForm.invalid || submitting">
+        {{ submitting ? 'Sauvegarde...' : 'Sauvegarder' }}
+      </button>
+    </div>
+  </form>
+</div>
+
+<ng-template #loadingTpl>
+  <div class="loading">Chargement...</div>
+</ng-template>

@@ -157,3 +157,36 @@ export class ConfigService {
     return of(result || { endName: name, params: [] });
   }
 }
+
+
+
+
+[
+  {
+    "endName": "test1 Configs",
+    "params": [
+      {
+        "name": "test1 0001",
+        "type": "boolean"
+      },
+      {
+        "name": "Otest1 002",
+        "type": "int"
+      }
+    ]
+  },
+  {
+    "endName": "test2 Configs",
+    "params": [
+      {
+        "name": "test 2 0001",
+        "type": "int"
+      },
+      {
+        "name": "testt 2 002",
+        "type": "String"
+      }
+    ]
+  }
+]
+

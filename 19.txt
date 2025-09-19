@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ConfigService } from './config.service';
-import { Config } from './config.interface';
 
 @Component({
   selector: 'app-config-form',
@@ -9,26 +9,105 @@ import { Config } from './config.interface';
   styleUrls: ['./config-form.component.css']
 })
 export class ConfigFormComponent implements OnInit {
-  config: Config | null = null;
+  form!: FormGroup;
+  configName!: string;
+  params: any[] = [];
   loading = true;
 
   constructor(
     private route: ActivatedRoute,
+    private fb: FormBuilder,
     private configService: ConfigService
   ) {}
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    this.configService.getConfigs().subscribe({
-      next: (configs) => {
-        this.config = configs.find(c => c.id === id) || null;
+    this.configName = this.route.snapshot.paramMap.get('name')!;
+    this.loadParams();
+  }
+
+  loadParams(): void {
+    this.configService.getParamsByName(this.configName).subscribe({
+      next: (data) => {
+        this.params = data.params;
+        this.createForm();
+        this.loading = false;
+      },
+      error: () => {
         this.loading = false;
       }
     });
   }
 
-  onSubmit(): void {
-    console.log('Formulaire soumis:', this.config);
-    alert('✅ Configuration sauvegardée !');
+  createForm(): void {
+    const group: any = {};
+    this.params.forEach(p => {
+      group[p.name] = [null, Validators.required];
+    });
+    this.form = this.fb.group(group);
   }
+
+  submit(): void {
+    if (this.form.valid) {
+      console.log('✅ Formulaire soumis:', this.form.value);
+      alert('Formulaire envoyé avec succès !');
+    }
+  }
+_________________________
+
+<div class="container">
+  <h2>Configuration: {{ configName }}</h2>
+
+  <div *ngIf="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Chargement des paramètres...</p>
+  </div>
+
+  <form *ngIf="!loading" [formGroup]="form" (ngSubmit)="submit()" class="form">
+    <div *ngFor="let p of params" class="form-group">
+      <label>{{ p.name }}</label>
+
+      <input *ngIf="p.type === 'string' || p.type === 'int'"
+             [type]="p.type === 'int' ? 'number' : 'text'"
+             formControlName="{{ p.name }}">
+
+      <input *ngIf="p.type === 'boolean'"
+             type="checkbox"
+             formControlName="{{ p.name }}">
+    </div>
+
+    <button type="submit" [disabled]="form.invalid" class="submit-btn">
+      Enregistrer
+    </button>
+  </form>
+</div>
+__________________________
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+input[type="text"], input[type="number"] {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.submit-btn {
+  background: #2196F3;
+  color: white;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.submit-btn:disabled {
+  background: #aaa;
+  cursor: not-allowed;
 }

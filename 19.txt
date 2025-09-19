@@ -111,3 +111,49 @@ input[type="text"], input[type="number"] {
   background: #aaa;
   cursor: not-allowed;
 }
+__________________
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+import { Config } from './config.interface';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ConfigService {
+  private apiUrl = 'http://localhost:8080/api/configs';
+
+  constructor(private http: HttpClient) {}
+
+  getConfigs(): Observable<Config[]> {
+    return this.http.get<Config[]>(this.apiUrl);
+  }
+
+  // ✅ Nouvelle méthode pour récupérer les paramètres par nom
+  getParamsByName(name: string): Observable<any> {
+    // Si backend REST dispo :
+    // return this.http.get<any>(`${this.apiUrl}/${name}/params`);
+
+    // Sinon mock pour tests :
+    const mockData = [
+      {
+        endName: 'database-config',
+        params: [
+          { name: 'EnableCache', type: 'boolean' },
+          { name: 'MaxConnections', type: 'int' }
+        ]
+      },
+      {
+        endName: 'email-config',
+        params: [
+          { name: 'SMTPHost', type: 'string' },
+          { name: 'Port', type: 'int' },
+          { name: 'UseSSL', type: 'boolean' }
+        ]
+      }
+    ];
+
+    const result = mockData.find(c => c.endName === name);
+    return of(result || { endName: name, params: [] });
+  }
+}

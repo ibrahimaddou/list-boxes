@@ -1,159 +1,577 @@
+// config.interface.ts
+export interface ConfigParameter {
+  name: string;
+  type: 'boolean' | 'int' | 'string' | 'select';
+  label?: string;
+  required?: boolean;
+  defaultValue?: any;
+  options?: string[];
+}
+
+export interface Config {
+  id: string;
+  endName: string;
+  title?: string;
+  params: ConfigParameter[];
+}
+
+// config-form.component.ts
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { ConfigService } from './config.service';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { ConfigService } from '../config.service';
+import { Config, ConfigParameter } from '../config.interface';
 
 @Component({
   selector: 'app-config-form',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './config-form.component.html',
   styleUrls: ['./config-form.component.css']
 })
 export class ConfigFormComponent implements OnInit {
-  form!: FormGroup;
-  configName!: string;
-  params: any[] = [];
-  loading = true;
+  config: Config | null = null;
+  configForm!: FormGroup;
+  loading = false;
+  submitting = false;
 
   constructor(
     private route: ActivatedRoute,
-    private fb: FormBuilder,
-    private configService: ConfigService
+    private router: Router,
+    private configService: ConfigService,
+    private fb: FormBuilder
   ) {}
 
   ngOnInit(): void {
-    this.configName = this.route.snapshot.paramMap.get('name')!;
-    this.loadParams();
+    const configId = this.route.snapshot.paramMap.get('id');
+    if (configId) {
+      this.loadConfig(configId);
+    }
   }
 
-  loadParams(): void {
-    this.configService.getParamsByName(this.configName).subscribe({
-      next: (data) => {
-        this.params = data.params;
-        this.createForm();
+  loadConfig(configId: string): void {
+    this.loading = true;
+    this.configService.getConfigs().subscribe({
+      next: (configs) => {
+        this.config = configs.find(c => c.id === configId) || null;
+        if (this.config) {
+          this.buildForm();
+        }
         this.loading = false;
       },
-      error: () => {
+      error: (err) => {
+        console.error('Erreur lors du chargement', err);
         this.loading = false;
       }
     });
   }
 
-  createForm(): void {
-    const group: any = {};
-    this.params.forEach(p => {
-      group[p.name] = [null, Validators.required];
+  buildForm(): void {
+    if (!this.config) return;
+
+    const controls: any = {};
+    
+    this.config.params.forEach(param => {
+      const validators = param.required ? [Validators.required] : [];
+      let defaultValue = param.defaultValue;
+
+      // Gérer les valeurs par défaut selon le type
+      if (param.type === 'boolean') {
+        defaultValue = defaultValue || false;
+      } else if (param.type === 'int') {
+        defaultValue = defaultValue || 0;
+      } else {
+        defaultValue = defaultValue || '';
+      }
+
+      controls[param.name] = [defaultValue, validators];
     });
-    this.form = this.fb.group(group);
+
+    this.configForm = this.fb.group(controls);
   }
 
-  submit(): void {
-    if (this.form.valid) {
-      console.log('✅ Formulaire soumis:', this.form.value);
-      alert('Formulaire envoyé avec succès !');
+  // Méthode helper pour obtenir le label d'affichage
+  getParameterLabel(param: ConfigParameter): string {
+    return param.label || this.formatParameterName(param.name);
+  }
+
+  // Formater le nom du paramètre en label lisible
+  private formatParameterName(name: string): string {
+    return name
+      .replace(/([A-Z])/g, ' $1') // Ajouter espace avant majuscules
+      .replace(/^./, str => str.toUpperCase()) // Première lettre en majuscule
+      .trim();
+  }
+
+  // Méthode pour obtenir le type d'input HTML
+  getInputType(paramType: string): string {
+    switch (paramType) {
+      case 'int':
+        return 'number';
+      case 'string':
+        return 'text';
+      case 'boolean':
+        return 'checkbox';
+      default:
+        return 'text';
     }
   }
-_________________________
 
-<div class="container">
-  <h2>Configuration: {{ configName }}</h2>
+  // Vérifier si un champ a des erreurs
+  hasError(paramName: string): boolean {
+    const control = this.configForm.get(paramName);
+    return !!(control?.invalid && (control?.dirty || control?.touched));
+  }
 
-  <div *ngIf="loading" class="loading">
-    <div class="spinner"></div>
-    <p>Chargement des paramètres...</p>
+  onSubmit(): void {
+    if (this.config && this.configForm.valid) {
+      this.submitting = true;
+      
+      // Transformer les données selon les types
+      const formData = { ...this.configForm.value };
+      
+      this.config.params.forEach(param => {
+        if (param.type === 'int' && formData[param.name]) {
+          formData[param.name] = parseInt(formData[param.name], 10);
+        }
+      });
+
+      this.configService.submitConfig(this.config.id, formData)
+        .subscribe({
+          next: () => {
+            this.router.navigate(['/configs']);
+            this.submitting = false;
+          },
+          error: (err) => {
+            console.error('Erreur lors de la soumission', err);
+            this.submitting = false;
+          }
+        });
+    } else {
+      // Marquer tous les champs comme touchés pour afficher les erreurs
+      this.configForm.markAllAsTouched();
+    }
+  }
+
+  goBack(): void {
+    this.router.navigate(['/configs']);
+  }
+}
+
+
+
+
+
+
+<!-- config-form.component.html -->
+<div *ngIf="config; else loadingTpl" class="form-container">
+  <div class="form-header">
+    <button class="back-button" (click)="goBack()" type="button">
+      <i class="fas fa-arrow-left"></i> Retour
+    </button>
+    <h1>{{ config.endName }}</h1>
   </div>
 
-  <form *ngIf="!loading" [formGroup]="form" (ngSubmit)="submit()" class="form">
-    <div *ngFor="let p of params" class="form-group">
-      <label>{{ p.name }}</label>
+  <form [formGroup]="configForm" (ngSubmit)="onSubmit()" novalidate>
+    <div class="form-grid">
+      <div *ngFor="let param of config.params" class="form-field">
+        <label [for]="param.name" class="form-label">
+          {{ getParameterLabel(param) }}
+          <span *ngIf="param.required" class="required">*</span>
+        </label>
 
-      <input *ngIf="p.type === 'string' || p.type === 'int'"
-             [type]="p.type === 'int' ? 'number' : 'text'"
-             formControlName="{{ p.name }}">
+        <!-- Input texte ou nombre -->
+        <input 
+          *ngIf="param.type === 'string' || param.type === 'int'"
+          [type]="getInputType(param.type)"
+          [id]="param.name"
+          [formControlName]="param.name"
+          [class.error]="hasError(param.name)"
+          class="form-input"
+          [placeholder]="param.type === 'int' ? 'Entrez un nombre' : 'Entrez du texte'"
+        />
 
-      <input *ngIf="p.type === 'boolean'"
-             type="checkbox"
-             formControlName="{{ p.name }}">
+        <!-- Checkbox pour boolean -->
+        <div *ngIf="param.type === 'boolean'" class="checkbox-container">
+          <input 
+            type="checkbox"
+            [id]="param.name"
+            [formControlName]="param.name"
+            class="form-checkbox"
+          />
+          <label [for]="param.name" class="checkbox-label">
+            Activer {{ getParameterLabel(param).toLowerCase() }}
+          </label>
+        </div>
+
+        <!-- Select si des options sont définies -->
+        <select 
+          *ngIf="param.options && param.options.length > 0"
+          [id]="param.name"
+          [formControlName]="param.name"
+          [class.error]="hasError(param.name)"
+          class="form-select"
+        >
+          <option value="">Sélectionner...</option>
+          <option *ngFor="let option of param.options" [value]="option">
+            {{ option }}
+          </option>
+        </select>
+
+        <!-- Messages d'erreur -->
+        <div *ngIf="hasError(param.name)" class="error-message">
+          <span *ngIf="configForm.get(param.name)?.errors?.['required']">
+            Ce champ est requis
+          </span>
+        </div>
+      </div>
     </div>
 
-    <button type="submit" [disabled]="form.invalid" class="submit-btn">
-      Enregistrer
-    </button>
+    <div class="form-actions">
+      <button type="button" class="btn-cancel" (click)="goBack()">
+        Annuler
+      </button>
+      <button 
+        type="submit" 
+        class="btn-submit" 
+        [disabled]="configForm.invalid || submitting"
+      >
+        <span *ngIf="submitting" class="spinner"></span>
+        {{ submitting ? 'Sauvegarde...' : 'Sauvegarder' }}
+      </button>
+    </div>
   </form>
 </div>
-__________________________
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-}
+<ng-template #loadingTpl>
+  <div class="loading">
+    <div class="spinner"></div>
+    <p>Chargement de la configuration...</p>
+  </div>
+</ng-template>
 
-input[type="text"], input[type="number"] {
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-}
-
-.submit-btn {
-  background: #2196F3;
-  color: white;
-  padding: 10px;
-  border: none;
+/* config-form.component.css */
+.form-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background: white;
   border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.form-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  margin-right: 20px;
+}
+
+.back-button:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.form-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.form-grid {
+  display: grid;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  display: block;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.required {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background-color: white;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-input.error,
+.form-select.error {
+  border-color: #ef4444;
+}
+
+.form-input.error:focus,
+.form-select.error:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #3b82f6;
   cursor: pointer;
 }
 
-.submit-btn:disabled {
-  background: #aaa;
+.checkbox-label {
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+  margin: 0;
+}
+
+.error-message {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #ef4444;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-cancel,
+.btn-submit {
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-cancel {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.btn-cancel:hover {
+  background-color: #e5e7eb;
+}
+
+.btn-submit {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.btn-submit:disabled {
+  background-color: #9ca3af;
   cursor: not-allowed;
 }
-__________________
+
+.btn-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #6b7280;
+}
+
+.loading p {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f4f6;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .form-container {
+    margin: 10px;
+    padding: 16px;
+  }
+  
+  .form-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  
+  .btn-cancel,
+  .btn-submit {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
+// config.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { Config } from './config.interface';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ConfigService {
-  private apiUrl = 'http://localhost:8080/api/configs';
+  private apiUrl = 'http://localhost:3000/api'; // Remplacez par votre URL API
 
   constructor(private http: HttpClient) {}
 
   getConfigs(): Observable<Config[]> {
-    return this.http.get<Config[]>(this.apiUrl);
+    return this.http.get<any[]>(`${this.apiUrl}/configs`).pipe(
+      map(configs => configs.map(config => this.transformConfig(config)))
+    );
   }
 
-  // ✅ Nouvelle méthode pour récupérer les paramètres par nom
-  getParamsByName(name: string): Observable<any> {
-    // Si backend REST dispo :
-    // return this.http.get<any>(`${this.apiUrl}/${name}/params`);
+  getConfigById(id: string): Observable<Config> {
+    return this.http.get<any>(`${this.apiUrl}/configs/${id}`).pipe(
+      map(config => this.transformConfig(config))
+    );
+  }
 
-    // Sinon mock pour tests :
-    const mockData = [
-      {
-        endName: 'database-config',
-        params: [
-          { name: 'EnableCache', type: 'boolean' },
-          { name: 'MaxConnections', type: 'int' }
-        ]
-      },
-      {
-        endName: 'email-config',
-        params: [
-          { name: 'SMTPHost', type: 'string' },
-          { name: 'Port', type: 'int' },
-          { name: 'UseSSL', type: 'boolean' }
-        ]
-      }
-    ];
+  submitConfig(configId: string, formData: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/configs/${configId}/submit`, formData);
+  }
 
-    const result = mockData.find(c => c.endName === name);
-    return of(result || { endName: name, params: [] });
+  // Transformer les données du backend pour correspondre à notre interface
+  private transformConfig(backendConfig: any): Config {
+    return {
+      id: backendConfig.id || this.generateId(),
+      endName: backendConfig.endName,
+      title: backendConfig.title || backendConfig.endName,
+      params: backendConfig.params.map((param: any) => ({
+        name: param.name,
+        type: param.type,
+        label: param.label || this.formatLabel(param.name),
+        required: param.required || false,
+        defaultValue: param.defaultValue,
+        options: param.options
+      }))
+    };
+  }
+
+  private generateId(): string {
+    return Math.random().toString(36).substr(2, 9);
+  }
+
+  private formatLabel(name: string): string {
+    return name
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
   }
 }
+
+// Exemple de données mocké pour les tests
+// mock-config.data.ts
+export const MOCK_CONFIGS = [
+  {
+    id: '1',
+    endName: "test1 Configs",
+    params: [
+      {
+        name: "test1 001",
+        type: "boolean",
+        required: true,
+        defaultValue: false
+      },
+      {
+        name: "otest1 002",
+        type: "int",
+        required: false,
+        defaultValue: 10
+      }
+    ]
+  },
+  {
+    id: '2',
+    endName: "test2 Configs",
+    params: [
+      {
+        name: "test 2 001",
+        type: "int",
+        required: true,
+        defaultValue: 0
+      },
+      {
+        name: "testt 2 002",
+        type: "string",
+        required: false,
+        defaultValue: "valeur par défaut"
+      }
+    ]
+  }
+];
